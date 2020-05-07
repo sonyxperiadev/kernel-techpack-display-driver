@@ -1315,6 +1315,14 @@ int sde_core_perf_init(struct sde_core_perf *perf,
 		perf->max_core_clk_rate = SDE_PERF_DEFAULT_MAX_CORE_CLK_RATE;
 	}
 
+	if (catalog->perf.default_perf_mode < SDE_PERF_MODE_MAX &&
+	    catalog->perf.default_perf_mode >= 0) {
+		perf->perf_tune.mode = catalog->perf.default_perf_mode;
+		SDE_DEBUG("Set perf mode %d\n", catalog->perf.default_perf_mode);
+	} else {
+		SDE_ERROR("Invalid default SDE perf mode. Ignoring setting\n");
+	}
+
 	return 0;
 
 err:

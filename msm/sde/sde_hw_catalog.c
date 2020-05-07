@@ -149,6 +149,7 @@
 #define DEFAULT_AMORTIZABLE_THRESHOLD		25
 #define DEFAULT_MNOC_PORTS			2
 #define DEFAULT_AXI_BUS_WIDTH			32
+#define DEFAULT_PERF_DEFAULT_MODE		0 // SDE_PERF_MODE_NORMAL
 #define DEFAULT_CPU_MASK			0
 #define DEFAULT_CPU_DMA_LATENCY			PM_QOS_DEFAULT_VALUE
 
@@ -228,6 +229,7 @@ enum {
 	PERF_CPU_MASK,
 	PERF_CPU_DMA_LATENCY,
 	PERF_CPU_IRQ_LATENCY,
+	PERF_DEFAULT_MODE,
 	PERF_PROP_MAX,
 };
 
@@ -553,6 +555,8 @@ static struct sde_prop_type sde_perf_prop[] = {
 			PROP_TYPE_U32},
 	{PERF_CPU_IRQ_LATENCY, "qcom,sde-qos-cpu-irq-latency", false,
 			PROP_TYPE_U32},
+	{PERF_DEFAULT_MODE, "qcom,sde-perf-default-mode",
+			false, PROP_TYPE_U32},
 };
 
 static struct sde_prop_type sde_qos_prop[] = {
@@ -3799,6 +3803,11 @@ static void _sde_perf_parse_dt_cfg_populate(struct sde_mdss_cfg *cfg,
 			PROP_VALUE_ACCESS(prop_value,
 				PERF_AXI_BUS_WIDTH, 0) :
 			DEFAULT_AXI_BUS_WIDTH;
+	cfg->perf.default_perf_mode =
+			prop_exists[PERF_DEFAULT_MODE] ?
+			PROP_VALUE_ACCESS(prop_value,
+				PERF_DEFAULT_MODE, 0) :
+			DEFAULT_PERF_DEFAULT_MODE;
 }
 
 static int _sde_perf_parse_dt_cfg(struct device_node *np,
