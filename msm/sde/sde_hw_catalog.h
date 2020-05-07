@@ -1182,6 +1182,7 @@ struct sde_perf_cfg {
 	u32 cpu_irq_latency;
 	u32 axi_bus_width;
 	u32 num_mnoc_ports;
+	u32 default_perf_mode;
 };
 
 /**
