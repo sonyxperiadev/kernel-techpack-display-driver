@@ -46,6 +46,19 @@ int vreg_name_to_config(struct dsi_regulator_info *regs,
 	return valid;
 }
 
+bool somc_panel_vreg_is_enabled(struct dsi_regulator_info *regs,
+				char *vreg_name)
+{
+	struct dsi_vreg vreg;
+	int is_invalid = 0;
+
+	is_invalid = vreg_name_to_config(regs, &vreg, vreg_name);
+	if (!is_invalid)
+		return regulator_is_enabled(vreg.vreg);
+
+	return 0;
+}
+
 int somc_panel_vreg_ctrl(struct dsi_regulator_info *regs,
 				char *vreg_name, bool enable)
 {
