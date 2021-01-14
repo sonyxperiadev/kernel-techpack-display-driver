@@ -407,6 +407,11 @@ static int dsi_panel_driver_touch_power_off(struct dsi_panel *panel)
 		}
 	}
 
+	rc = somc_panel_vreg_ctrl(&panel->power_info, "ts_vddh", false);
+	if (rc)
+		pr_err("%s: failed to disable ts_vddh, rc=%d\n", __func__, rc);
+
+
 	if (gpio_is_valid(spec_pdata->touch_vddio_en_gpio)) {
 		rc = gpio_direction_output(spec_pdata->touch_vddio_en_gpio, 1);
 		if (rc) {
@@ -414,6 +419,10 @@ static int dsi_panel_driver_touch_power_off(struct dsi_panel *panel)
 			goto exit;
 		}
 	}
+
+	rc = somc_panel_vreg_ctrl(&panel->power_info, "ts_io", false);
+	if (rc)
+		pr_err("%s: failed to disable ts_io, rc=%d\n", __func__, rc);
 exit:
 	return rc;
 }
@@ -674,7 +683,7 @@ int dsi_panel_driver_pre_power_on(struct dsi_panel *panel)
 {
 	struct panel_specific_pdata *spec_pdata = NULL;
 	struct incell_ctrl *incell = incell_get_info();
-	int rc = 0;
+	int sts, rc = 0;
 	struct drm_ext_event event;
 	int blank = DRM_BLANK_UNBLANK;
 	event.data = &blank;
@@ -749,6 +758,31 @@ int dsi_panel_driver_pre_power_on(struct dsi_panel *panel)
 			}
 			gpio_set_value(spec_pdata->disp_oled_vci_gpio, 1);
 		}
+
+		sts = somc_panel_vreg_is_enabled(&panel->power_info,
+						      "ts_io");
+		if (!sts) {
+			rc = somc_panel_vreg_ctrl(&panel->power_info,
+							"ts_io", true);
+			if (rc) {
+				pr_err("%s: cannot enable ts_io: %d\n",
+					__func__, rc);
+				goto exit;
+			}
+		}
+
+		sts = somc_panel_vreg_is_enabled(&panel->power_info,
+						 "ts_vddh");
+		if (!sts) {
+			rc = somc_panel_vreg_ctrl(&panel->power_info,
+						  "ts_vddh", true);
+			if (rc) {
+				pr_err("%s: cannot enable ts_vddh: %d\n",
+					__func__, rc);
+				goto exit;
+			}
+		}
+		usleep_range(10000, 11000);
 	}
 
 	dsi_panel_driver_touch_pinctrl_set_state(panel, true);
@@ -786,6 +820,7 @@ int dsi_panel_driver_power_on(struct dsi_panel *panel)
 			pr_err("%s: failed to set pinctrl, rc=%d\n", __func__, rc);
 			goto error_disable_vregs;
 		}
+		usleep_range(1000, 1100);
 
 		rc = dsi_panel_reset(panel);
 		if (rc) {
@@ -824,6 +859,7 @@ int dsi_panel_driver_power_on(struct dsi_panel *panel)
 			pr_err("%s: failed to set pinctrl, rc=%d\n", __func__, rc);
 			goto error_disable_vregs;
 		}
+		usleep_range(1000, 1100);
 
 		rc = dsi_panel_reset(panel);
 		if (rc) {
@@ -878,7 +914,7 @@ static int dsi_panel_driver_parse_reset_touch_sequence(struct dsi_panel *panel,
 	spec_pdata = panel->spec_pdata;
 
 	arr = of_get_property(of_node,
-			      "qcom,mdss-dsi-touch-reset-sequence",
+			      "somc,mdss-dsi-touch-reset-sequence",
 			      &length);
 	if (!arr) {
 		pr_err("%s: dsi-reset-touch-sequence not found\n", __func__);
@@ -904,7 +940,7 @@ static int dsi_panel_driver_parse_reset_touch_sequence(struct dsi_panel *panel,
 	}
 
 	rc = of_property_read_u32_array(of_node,
-					"qcom,mdss-dsi-touch-reset-sequence",
+					"somc,mdss-dsi-touch-reset-sequence",
 					arr_32, length);
 	if (rc) {
 		pr_err("%s: cannot read dsi-touch-reset-seqience\n", __func__);
@@ -1156,6 +1192,27 @@ int dsi_panel_driver_parse_dt(struct dsi_panel *panel,
 								__func__);
 	}
 
+	valid = -EINVAL;
+	for (i = 0; i < touch_power_info->count; i++) {
+		if (!strcmp("ts_vddh",
+			touch_power_info->vregs[i].vreg_name)) {
+			valid = 0;
+			break;
+		}
+	}
+	if (!valid) {
+		rc = of_property_read_u32(np,
+				"somc,pw-wait-after-on-touch-vddh", &tmp);
+		touch_power_info->vregs[i].post_on_sleep = !rc ? tmp : 0;
+
+		rc = of_property_read_u32(np,
+				"somc,pw-wait-after-off-touch-vddh", &tmp);
+		touch_power_info->vregs[i].post_off_sleep = !rc ? tmp : 0;
+	} else {
+		pr_notice("%s: touch avdd power info not registered\n",
+								__func__);
+	}
+
 	panel_type = of_get_property(np, "somc,dsi-panel-type", NULL);
 	if (!panel_type) {
 		pr_debug("%s:failed parse dsi-panel-type \n", __func__);
@@ -1201,8 +1258,8 @@ int dsi_panel_driver_parse_dt(struct dsi_panel *panel,
 	panel->lp11_init = of_property_read_bool(np,
 			"qcom,mdss-dsi-lp11-init");
 
-	spec_pdata->hbm.hbm_supported = of_property_read_bool(np,
-			"somc,set-hbm-usable");
+	spec_pdata->hbm.hbm_supported = !of_property_read_bool(np,
+			"somc,set-hbm-not-usable");
 
 	rc = somc_panel_parse_dt_chgfps_config(panel, np);
 	if (rc) {
@@ -1602,6 +1659,12 @@ int somc_panel_set_doze_mode(struct drm_connector *connector,
 	switch (power_mode) {
 		case SDE_MODE_DPMS_ON:
 			pr_debug("Requested DPMS ON state.\n");
+
+			dsi_pwr_panel_regulator_mode_set(&panel->power_info,
+				"ibb", REGULATOR_MODE_NORMAL);
+			dsi_pwr_panel_regulator_mode_set(&panel->power_info,
+				"lab", REGULATOR_MODE_NORMAL);
+
 			if (display_aod_mode != SDE_MODE_DPMS_OFF)
 				rc = dsi_panel_set_aod_off(panel);
 			spec_pdata->aod_mode = power_mode;
@@ -1623,6 +1686,12 @@ int somc_panel_set_doze_mode(struct drm_connector *connector,
 			spec_pdata->aod_mode = power_mode;
 			display_aod_mode = power_mode;
 
+			dsi_pwr_panel_regulator_mode_set(&panel->power_info,
+				"ibb", REGULATOR_MODE_IDLE);
+			dsi_pwr_panel_regulator_mode_set(&panel->power_info,
+				"lab", REGULATOR_MODE_IDLE);
+
+			rc = dsi_panel_set_lp1(panel);
 			rc = dsi_panel_set_aod_on(panel);
 			dsi_panel_driver_notify_suspend(panel);
 			break;
@@ -1651,6 +1720,17 @@ int somc_panel_set_doze_mode(struct drm_connector *connector,
 		case SDE_MODE_DPMS_OFF:
 			pr_info("Entering OFF state from %d\n",
 					spec_pdata->aod_mode);
+
+			if (spec_pdata->aod_mode == SDE_MODE_DPMS_LP1 ||
+			    spec_pdata->aod_mode == SDE_MODE_DPMS_LP2) {
+				dsi_pwr_panel_regulator_mode_set(
+						&panel->power_info,
+						"ibb", REGULATOR_MODE_STANDBY);
+
+				dsi_pwr_panel_regulator_mode_set(
+						&panel->power_info,
+						"lab", REGULATOR_MODE_STANDBY);
+			}
 
 			spec_pdata->sod_mode = SOD_POWER_OFF;
 			spec_pdata->pre_sod_mode = SOD_POWER_OFF;
