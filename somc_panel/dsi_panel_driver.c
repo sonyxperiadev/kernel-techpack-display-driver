@@ -1216,12 +1216,12 @@ int dsi_panel_driver_parse_dt(struct dsi_panel *panel,
 	panel_type = of_get_property(np, "somc,dsi-panel-type", NULL);
 	if (!panel_type) {
 		pr_debug("%s:failed parse dsi-panel-type \n", __func__);
-		spec_pdata->oled_disp = false;
-	} else if (!strcmp(panel_type, "oled")) {
 		spec_pdata->oled_disp = true;
+	} else if (!strcmp(panel_type, "lcd")) {
+		spec_pdata->oled_disp = false;
 	} else {
 		pr_err("%s:failed parse dsi-panel-type \n", __func__);
-		spec_pdata->oled_disp = false;
+		spec_pdata->oled_disp = true;
 	}
 
 	rc = of_property_read_u32(np,
