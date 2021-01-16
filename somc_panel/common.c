@@ -56,7 +56,7 @@ bool somc_panel_vreg_is_enabled(struct dsi_regulator_info *regs,
 	if (!is_invalid)
 		return regulator_is_enabled(vreg.vreg);
 
-	return 0;
+	return false;
 }
 
 int somc_panel_vreg_ctrl(struct dsi_regulator_info *regs,
