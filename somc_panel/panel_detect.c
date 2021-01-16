@@ -98,7 +98,10 @@ static inline int single_panel_setup(struct dsi_display *display,
 {
 	struct device_node *this = *node;
 	struct device_node *pan =
-		of_parse_phandle(this, "qcom,dsi-panel", 0);
+		of_parse_phandle(this, "qcom,dsi-default-panel", 0);
+
+	if (!IS_ERR_OR_NULL(display->panel_node))
+		return 0;
 
 	if (pan == NULL) {
 		pr_err("%s: Cannot find phandle to DSI panel!!!\n", __func__);
@@ -121,10 +124,8 @@ int somc_panel_detect(struct dsi_display *display,
 
 	int rc = 0;
 
-	if (of_property_read_bool(*node, "somc,bootloader-panel-detect")) {
-		pr_err("Bootloader gives us the panel name. Nice job!\n");
+	if (!of_property_read_bool(*node, "somc,start-panel-detection"))
 		return single_panel_setup(display, node);
-	};
 
 	if (use_cmd_detect || use_dric_only) {
 		pr_err("Command detection or DrIC detection not yet supported "
