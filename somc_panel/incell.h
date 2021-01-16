@@ -68,14 +68,7 @@ typedef enum {
  * @return INCELL_OK     : Get power status successfully <br>
  *         INCELL_ERROR  : Failed to get power status.
  */
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern int incell_get_power_status(incell_pw_status *power_status);
-#else
-static inline int incell_get_power_status(incell_pw_status *power_status) {
-		power_status->display_power = INCELL_POWER_ON;
-		power_status->touch_power = INCELL_POWER_ON;
-		return INCELL_OK;}
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 /**
  * @brief Display control mode.
@@ -87,11 +80,7 @@ static inline int incell_get_power_status(incell_pw_status *power_status) {
  *         INCELL_EBUSY     : try lock failed.
  * @attention You cannot call this function from same fb_blank context.
  */
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern int incell_control_mode(incell_intf_mode mode, bool force);
-#else
-static inline int incell_control_mode(incell_intf_mode mode, bool force) {return INCELL_OK;}
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 /**
  * @brief LCD/Touch Power lock control.
@@ -104,58 +93,16 @@ static inline int incell_control_mode(incell_intf_mode mode, bool force) {return
  *         INCELL_ALREADY_LOCKED   : Already power locked <br>
  *         INCELL_ALREADY_UNLOCKED : Already power unlocked.
  */
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern int incell_power_lock_ctrl(incell_pw_lock lock,
 		incell_pw_status *power_status);
-#else
-static inline int incell_power_lock_ctrl(incell_pw_lock lock,
-					 incell_pw_status *power_status) {return INCELL_OK;}
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
-
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern int incell_get_panel_name(void);
-#else
-static inline int incell_get_panel_name(void) {return 0; }
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
-
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern bool incell_get_system_status(void);
-#else
-static inline bool incell_get_system_status(void) {return true; }
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
-
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern int incell_get_display_aod(void);
-#else
-static inline int incell_get_display_aod(void) {return 0; }
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
-
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern int incell_get_display_sod(void);
-#else
-static inline int incell_get_display_sod(void) {return 0; }
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
-
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 extern int incell_get_display_pre_sod(void);
-#else
-static inline int incell_get_display_pre_sod(void) {return 0; }
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
-
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 int somc_panel_external_control_touch_power(bool enable);
-#else
-static inline int somc_panel_external_control_touch_power(bool enable)
-{ return 0; }
-#endif
-
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 bool incell_touch_is_compatible(incell_touch_type type);
-#else
-static inline bool incell_touch_is_compatible(incell_touch_type) {
-	return true;
-}
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 
 #endif /* __INCELL_H__ */
 
