@@ -29,6 +29,9 @@
 #include "sde_hdcp.h"
 #include "dp_debug.h"
 #include "sde_dbg.h"
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+#include "dp_usbpd.h"
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 #define DP_MST_DEBUG(fmt, ...) DP_DEBUG(fmt, ##__VA_ARGS__)
 
@@ -123,6 +126,9 @@ static char *dp_display_state_name(enum dp_display_states state)
 }
 
 static struct dp_display *g_dp_display;
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+struct device virtualdev;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 #define HPD_STRING_SIZE 30
 
 struct dp_hdcp_dev {
@@ -192,6 +198,9 @@ struct dp_display_private {
 	bool process_hpd_connect;
 
 	struct notifier_block usb_nb;
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	u32 dp_stop_state;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 };
 
 static const struct of_device_id dp_dt_match[] = {
@@ -1126,6 +1135,15 @@ static int dp_display_usbpd_configure_cb(struct device *dev)
 		goto end;
 	}
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	/* check for stop_state */
+	if (dp->dp_stop_state) {
+		pr_info("dp is stopped (state=%08x), skip dp_display_usbpd_configure\n",
+							dp->dp_stop_state);
+		goto end;
+	}
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 	if (!dp->debug->sim_mode && !dp->parser->no_aux_switch
 	    && !dp->parser->gpio_aux_switch) {
 		rc = dp->aux->aux_switch(dp->aux, true, dp->hpd->orientation);
@@ -1460,6 +1478,15 @@ static int dp_display_usbpd_attention_cb(struct device *dev)
 		DP_ERR("no driver data found\n");
 		return -ENODEV;
 	}
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	/* check for stop_state */
+	if (dp->dp_stop_state) {
+		pr_info("dp is stopped (state=%08x), skip dp_display_usbpd_attention\n",
+							dp->dp_stop_state);
+		return 0;
+	}
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 
 	DP_DEBUG("hpd_irq:%d, hpd_high:%d, power_on:%d, is_connected:%d\n",
 			dp->hpd->hpd_irq, dp->hpd->hpd_high,
