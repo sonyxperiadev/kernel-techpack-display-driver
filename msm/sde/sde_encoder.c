@@ -4810,6 +4810,19 @@ static void _sde_encoder_helper_hdr_plus_mempool_update(
 	}
 }
 
+void dsi_display_set_encoder_rst(struct drm_encoder *drm_enc)
+{
+	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
+	struct sde_encoder_phys *phys;
+	int i;
+
+	for (i = 0; i < sde_enc->num_phys_encs; i++) {
+		phys = sde_enc->phys_encs[i];
+		phys->enable_state = SDE_ENC_ERR_NEEDS_HW_RESET;
+	}
+}
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 void sde_encoder_needs_hw_reset(struct drm_encoder *drm_enc)
 {
 	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
@@ -4822,6 +4835,7 @@ void sde_encoder_needs_hw_reset(struct drm_encoder *drm_enc)
 			phys->ops.hw_reset(phys);
 	}
 }
+#endif
 
 int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)

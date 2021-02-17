@@ -7688,6 +7688,10 @@ int dsi_display_pre_commit(void *display,
 	return rc;
 }
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+void dsi_display_set_encoder_rst(struct drm_encoder *drm_enc);
+#endif
+
 int dsi_display_enable(struct dsi_display *display)
 {
 	int rc = 0;
@@ -7710,6 +7714,8 @@ int dsi_display_enable(struct dsi_display *display)
 	if (display->is_cont_splash_enabled) {
 #ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 		struct dsi_display_mode *adj_mode = NULL;
+		struct drm_connector *connector = display->drm_conn;
+		u32 saved_bl_lvl = display->panel->bl_config.bl_level;
 #endif
 
 		dsi_display_config_ctrl_for_cont_splash(display);
@@ -7736,16 +7742,30 @@ int dsi_display_enable(struct dsi_display *display)
 			return 0;
 
 		/*
+		 * To avoid showing display corruption during dynamic mode
+		 * setting, set the backlight level to zero: you have been
+		 * tricked... and you have been, quite possibly, bamboozled!
+		 */
+		rc = dsi_panel_set_backlight(display->panel, 0);
+		if (rc)
+			DSI_ERR("Cannot set BL, you may see corruption.\n");
+
+		/*
 		 * At this point the panel is ON from bootloader (displaying
 		 * the splash screen) and the Command Mode Engine is also up:
 		 * send the commands to switch the resolution NOW!
 		 */
-		pr_info("[%s] Dynamic Mode Setting: switching now!\n",
-			display->name);
-		rc = dsi_panel_post_switch(display->panel);
-		if (rc)
-			pr_warn("[%s] Cannot send post-switch cmd: %d\n",
+		pr_info("[%s] Dynamic Mode Setting (%ux%u): switching now!\n",
+			display->name, mode->timing.h_active,
+			mode->timing.v_active);
+		rc = dsi_panel_switch(display->panel);
+		if (rc) {
+			pr_err("[%s] CRITICAL: Cannot switch resolution: "
+			       "rc = %d - Returning failure and "
+			       "hoping for DSI recovery...\n",
 				display->name, rc);
+			return rc;
+		}
 
 		/* If Display Stream Compression is required, update params. */
 		if (mode->priv_info->dsc_enabled) {
@@ -7756,14 +7776,10 @@ int dsi_display_enable(struct dsi_display *display)
 					display->name, rc);
 		}
 
-		rc = dsi_panel_switch(display->panel);
-		if (rc) {
-			pr_err("[%s] CRITICAL: Cannot switch resolution: "
-			       "rc = %d - Returning failure and "
-			       "hoping for DSI recovery...\n",
+		rc = dsi_panel_post_switch(display->panel);
+		if (rc)
+			pr_warn("[%s] Cannot send post-switch cmd: %d\n",
 				display->name, rc);
-			return rc;
-		}
 
 		/*
 		 * Find the entry for the current DRM mode structure:
@@ -7776,11 +7792,37 @@ int dsi_display_enable(struct dsi_display *display)
 			return rc;
 		}
 
+		rc = dsi_display_dynamic_clk_configure_cmd(display,
+							   adj_mode->timing.clk_rate_hz);
+		if (rc)
+			pr_err("[%s] Cannot set dsi shadow clocks\n", __func__);
+
+		if (mode->priv_info->phy_timing_len) {
+			int i;
+			display_for_each_ctrl(i, display) {
+				rc = dsi_phy_set_timing_params(
+					display->ctrl[i].phy,
+					adj_mode->priv_info->phy_timing_val,
+					adj_mode->priv_info->phy_timing_len,
+					true);
+				if (rc)
+					pr_err("[%s] Cannot set PHY%d timing params\n",
+					        __func__, i);
+			}
+		}
+
 		/* Reset the splash_dms flag: we're out of cont splash now */
 		adj_mode->splash_dms = false;
 
 		/* Remove the DMS flag, since we have already switched */
 		adj_mode->dsi_mode_flags &= ~DSI_MODE_FLAG_DMS;
+
+		/* Schedule a HW reset at kickoff to reduce corrupted initial frames */
+		dsi_display_set_encoder_rst(connector->encoder);
+
+		rc = dsi_panel_set_backlight(display->panel, saved_bl_lvl);
+		if (rc)
+			DSI_ERR("Cannot set backlight. This is sad.\n");
 
 #endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 		return 0;
