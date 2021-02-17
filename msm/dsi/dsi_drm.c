@@ -835,6 +835,9 @@ int dsi_connector_get_modes(struct drm_connector *connector, void *data,
 		0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
 		0x01, 0x01, 0x01, 0x01,
 	};
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	int forced_dms_found = -1;
+#endif
 
 	edid_size = min_t(u32, sizeof(edid), EDID_LENGTH);
 
@@ -853,8 +856,21 @@ int dsi_connector_get_modes(struct drm_connector *connector, void *data,
 		goto end;
 	}
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	/* Check if we have any overrides */
+	for (i = 0; i < count; i++) {
+		if (modes[i].splash_dms)
+			forced_dms_found = i;
+	}
+#endif
+
 	for (i = 0; i < count; i++) {
 		struct drm_display_mode *m;
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+		if (modes[i].splash_dms)
+			modes[i].dsi_mode_flags |= DSI_MODE_FLAG_DMS;
+#endif
 
 		memset(&drm_mode, 0x0, sizeof(drm_mode));
 		dsi_convert_to_drm_mode(&modes[i], &drm_mode);
@@ -877,6 +893,18 @@ int dsi_connector_get_modes(struct drm_connector *connector, void *data,
 			/* set the first mode in list as preferred */
 			m->type |= DRM_MODE_TYPE_PREFERRED;
 		}
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+		/* Override preferred modes if we want to force a mode preference */
+		if (forced_dms_found >= 0) {
+			if (i != forced_dms_found)
+				m->type &= ~DRM_MODE_TYPE_PREFERRED;
+			else
+				drm_set_preferred_mode(
+					connector, m->hdisplay, m->vdisplay);
+		}
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 		drm_mode_probed_add(connector, m);
 	}
 
