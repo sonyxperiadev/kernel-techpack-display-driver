@@ -582,7 +582,7 @@ int dsi_panel_rx_cmd(struct dsi_display *display, struct dsi_cmd_desc *cmds,
 {
 	int rc = 0;
 	ssize_t reslen;
-	int flags = 0;
+	u32 flags;
 
 	dsi_display_clk_ctrl(display->dsi_clk_handle,
 		DSI_ALL_CLKS, DSI_CLK_ON);
@@ -597,7 +597,7 @@ int dsi_panel_rx_cmd(struct dsi_display *display, struct dsi_cmd_desc *cmds,
 	cmds->msg.rx_buf = rbuf;
 	cmds->msg.rx_len = len;
 	pr_debug("%s: tx = %x\n", __func__, *(char *)(cmds->msg.tx_buf));
-	reslen = dsi_ctrl_cmd_transfer(ctrl->ctrl, &(cmds->msg), flags);
+	reslen = dsi_ctrl_cmd_transfer(ctrl->ctrl, &(cmds->msg), &flags);
 
 	if (reslen < 0) {
 		rc = reslen;
