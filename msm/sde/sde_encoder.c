@@ -4822,7 +4822,6 @@ void dsi_display_set_encoder_rst(struct drm_encoder *drm_enc)
 	}
 }
 
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
 void sde_encoder_needs_hw_reset(struct drm_encoder *drm_enc)
 {
 	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
@@ -4835,7 +4834,6 @@ void sde_encoder_needs_hw_reset(struct drm_encoder *drm_enc)
 			phys->ops.hw_reset(phys);
 	}
 }
-#endif
 
 int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)
