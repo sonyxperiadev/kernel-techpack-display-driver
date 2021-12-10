@@ -1137,6 +1137,12 @@ static int dsi_ctrl_copy_and_pad_cmd(struct dsi_ctrl *dsi_ctrl,
 			(cmd_type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM))
 		buf[3] |= BIT(5);
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	if (((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) ||
+		((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) ||
+		((buf[2] & 0x3f) == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM))
+		buf[3] |= BIT(5);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 	*buffer = buf;
 	*size = len;
 
@@ -1562,8 +1568,12 @@ static int dsi_message_tx(struct dsi_ctrl *dsi_ctrl,
 	if (dsi_ctrl->dma_wait_queued)
 		dsi_ctrl_flush_cmd_dma_queue(dsi_ctrl);
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	if (dsi_ctrl->cell_index == 1)
+#else
 	if ((*flags & DSI_CTRL_CMD_BROADCAST) &&
 			(!(*flags & DSI_CTRL_CMD_BROADCAST_MASTER)))
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
 		dsi_ctrl_clear_slave_dma_status(dsi_ctrl, *flags);
 
 	if (*flags & DSI_CTRL_CMD_NON_EMBEDDED_MODE) {
@@ -3482,6 +3492,23 @@ int dsi_ctrl_cmd_transfer(struct dsi_ctrl *dsi_ctrl,
 error:
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 	return rc;
+}
+
+void dsi_ctrl_clear_slave_broadcast(struct dsi_ctrl *dsi_ctrl)
+{
+	struct dsi_ctrl_hw_ops dsi_hw_ops;
+
+	if (!dsi_ctrl)
+		DSI_CTRL_ERR(dsi_ctrl, "Invalid params\n");
+
+	mutex_lock(&dsi_ctrl->ctrl_lock);
+
+	dsi_hw_ops = dsi_ctrl->hw.ops;
+
+	if (dsi_hw_ops.clear_slave_broadcast)
+		dsi_hw_ops.clear_slave_broadcast(&dsi_ctrl->hw);
+
+	mutex_unlock(&dsi_ctrl->ctrl_lock);
 }
 
 /**
