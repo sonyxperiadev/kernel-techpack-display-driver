@@ -60,6 +60,14 @@ ifeq ($(CONFIG_ARCH_MONACO), y)
 LINUXINCLUDE    += -include $(srctree)/techpack/display/config/monacodispconf.h
 endif
 
+ifeq ($(CONFIG_ARCH_SONY_SAGAMI), y)
+include $(srctree)/techpack/display/config/sagamidisp.conf
+endif
+
+ifeq ($(CONFIG_ARCH_SONY_SAGAMI), y)
+LINUXINCLUDE    += -include $(srctree)/techpack/display/config/sagamidispconf.h
+endif
+
 obj-$(CONFIG_DRM_MSM) += msm/
 
 ifeq ($(CONFIG_ARCH_SDXLEMUR), y)
