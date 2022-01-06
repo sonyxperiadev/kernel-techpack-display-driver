@@ -16,7 +16,6 @@
 #include <linux/platform_device.h>
 #include <linux/notifier.h>
 #include <linux/export.h>
-#include <linux/drm_notify.h>
 #include "dsi_panel_driver.h"
 #include "dsi_panel.h"
 #include "dsi_display.h"
@@ -32,24 +31,6 @@ static int buf_sz;
 
 #define BR_MAX_FIGURE	9
 #define AREA_COUNT_MAX	9999999
-
-int drm_register_client(struct notifier_block *nb)
-{
-	return blocking_notifier_chain_register(&drm_notifier_list, nb);
-}
-EXPORT_SYMBOL(drm_register_client);
-
-int drm_unregister_client(struct notifier_block *nb)
-{
-	return blocking_notifier_chain_unregister(&drm_notifier_list, nb);
-}
-EXPORT_SYMBOL(drm_unregister_client);
-
-int drm_notifier_call_chain(unsigned long val, void *v)
-{
-	return blocking_notifier_call_chain(&drm_notifier_list, val, v);
-}
-EXPORT_SYMBOL_GPL(drm_notifier_call_chain);
 
 static int dsi_panel_driver_vreg_name_to_config(
 		struct dsi_regulator_info *regs,
@@ -497,13 +478,9 @@ int dsi_panel_driver_post_power_off(struct dsi_panel *panel)
 	struct panel_specific_pdata *spec_pdata = NULL;
 	struct incell_ctrl *incell = incell_get_info();
 	int rc = 0;
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_POWERDOWN;
-	event.data = &blank;
 
 	if (incell->seq == POWER_SKIP) {
 		pr_notice("%s: Post power off skip\n", __func__);
-		drm_notifier_call_chain(DRM_EXT_EVENT_AFTER_BLANK, &event);
 		return rc;
 	}
 
@@ -558,7 +535,6 @@ int dsi_panel_driver_post_power_off(struct dsi_panel *panel)
 		pr_err("%s: failed set pinctrl state, rc=%d\n", __func__, rc);
 
 	incell->state &= INCELL_POWER_STATE_OFF;
-	drm_notifier_call_chain(DRM_EXT_EVENT_AFTER_BLANK, &event);
 
 	return rc;
 }
@@ -569,20 +545,14 @@ int dsi_panel_driver_pre_power_on(struct dsi_panel *panel)
 	struct incell_ctrl *incell = incell_get_info();
 	int rc = 0;
 	int touch_power_state = 0;
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_UNBLANK;
-	event.data = &blank;
 
 	dsi_panel_driver_power_on_ctrl();
 	if (incell->seq == POWER_SKIP) {
 		pr_notice("%s: Pre power on skip\n", __func__);
-		drm_notifier_call_chain(DRM_EXT_EVENT_BEFORE_BLANK, &event);
 		return rc;
 	}
 
 	spec_pdata = panel->spec_pdata;
-
-	drm_notifier_call_chain(DRM_EXT_EVENT_BEFORE_BLANK, &event);
 
 	rc = dsi_panel_driver_vreg_ctrl(&panel->power_info, "vddio", true);
 	if (rc) {
@@ -1010,24 +980,6 @@ exit:
 	return rc;
 }
 
-static void dsi_panel_driver_notify_resume(struct dsi_panel *panel)
-{
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_UNBLANK;
-	event.data = &blank;
-
-	drm_notifier_call_chain(DRM_EXT_EVENT_AFTER_BLANK, &event);
-}
-
-static void dsi_panel_driver_notify_suspend(struct dsi_panel *panel)
-{
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_POWERDOWN;
-	event.data = &blank;
-
-	drm_notifier_call_chain(DRM_EXT_EVENT_BEFORE_BLANK, &event);
-}
-
 void dsi_panel_driver_post_enable(struct dsi_panel *panel)
 {
 	panel->spec_pdata->display_onoff_state = true;
@@ -1041,13 +993,11 @@ void dsi_panel_driver_post_enable(struct dsi_panel *panel)
 		}
         }
 	dsi_panel_driver_oled_short_det_enable(panel->spec_pdata, SHORT_WORKER_PASSIVE);
-	dsi_panel_driver_notify_resume(panel);
 }
 
 void dsi_panel_driver_pre_disable(struct dsi_panel *panel)
 {
 	dsi_panel_driver_oled_short_det_disable(panel->spec_pdata);
-	dsi_panel_driver_notify_suspend(panel);
 }
 
 void dsi_panel_driver_disable(struct dsi_panel *panel)
