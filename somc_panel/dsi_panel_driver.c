@@ -27,15 +27,12 @@
 #include <linux/platform_device.h>
 #include <linux/notifier.h>
 #include <linux/export.h>
-#include <linux/drm_notify.h>
 #include <linux/sde_io_util.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include "somc_panel_exts.h"
 
 #define AOD_MODE_THRESHOLD 8
-
-static BLOCKING_NOTIFIER_HEAD(drm_notifier_list);
 
 static u32 down_period;
 static short display_sod_mode = 0;
@@ -52,24 +49,6 @@ static int buf_sz;
 
 #define NOT_CHARGEMON_EXIT 0
 static int s_chargemon_exit = NOT_CHARGEMON_EXIT;
-
-int drm_register_client(struct notifier_block *nb)
-{
-	return blocking_notifier_chain_register(&drm_notifier_list, nb);
-}
-EXPORT_SYMBOL(drm_register_client);
-
-int drm_unregister_client(struct notifier_block *nb)
-{
-	return blocking_notifier_chain_unregister(&drm_notifier_list, nb);
-}
-EXPORT_SYMBOL(drm_unregister_client);
-
-int drm_notifier_call_chain(unsigned long val, void *v)
-{
-	return blocking_notifier_call_chain(&drm_notifier_list, val, v);
-}
-EXPORT_SYMBOL_GPL(drm_notifier_call_chain);
 
 int dsi_panel_driver_pinctrl_init(struct dsi_panel *panel)
 {
@@ -574,13 +553,9 @@ int dsi_panel_driver_post_power_off(struct dsi_panel *panel)
 	struct panel_specific_pdata *spec_pdata = NULL;
 	struct incell_ctrl *incell = incell_get_info();
 	int rc = 0;
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_POWERDOWN;
-	event.data = &blank;
 
 	if (incell->seq == POWER_SKIP) {
 		pr_notice("%s: Post power off skip\n", __func__);
-		drm_notifier_call_chain(DRM_EXT_EVENT_AFTER_BLANK, &event);
 		return rc;
 	}
 
@@ -671,7 +646,6 @@ int dsi_panel_driver_post_power_off(struct dsi_panel *panel)
 		pr_err("%s: failed set pinctrl state, rc=%d\n", __func__, rc);
 
 	incell->state &= INCELL_POWER_STATE_OFF;
-	drm_notifier_call_chain(DRM_EXT_EVENT_AFTER_BLANK, &event);
 
 	if (spec_pdata->down_period)
 		down_period = (u32)ktime_to_ms(ktime_get());
@@ -684,14 +658,10 @@ int dsi_panel_driver_pre_power_on(struct dsi_panel *panel)
 	struct panel_specific_pdata *spec_pdata = NULL;
 	struct incell_ctrl *incell = incell_get_info();
 	int sts, rc = 0;
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_UNBLANK;
-	event.data = &blank;
 
 	dsi_panel_driver_power_on_ctrl();
 	if (incell->seq == POWER_SKIP) {
 		pr_notice("%s: Pre power on skip\n", __func__);
-		drm_notifier_call_chain(DRM_EXT_EVENT_BEFORE_BLANK, &event);
 		return rc;
 	}
 
@@ -713,8 +683,6 @@ int dsi_panel_driver_pre_power_on(struct dsi_panel *panel)
 	spec_pdata->sod_mode = SOD_POWER_ON;
 	spec_pdata->pre_sod_mode = SOD_POWER_ON;
 	spec_pdata->aod_mode = SDE_MODE_DPMS_ON;
-
-	drm_notifier_call_chain(DRM_EXT_EVENT_BEFORE_BLANK, &event);
 
 	rc = somc_panel_vreg_ctrl(&panel->power_info, "vddio", true);
 	if (rc) {
@@ -1562,25 +1530,6 @@ static void somc_panel_hbm_protect_work(struct work_struct *work)
 	dsi_panel_set_hbm_mode(panel, 0);
 }
 
-static void dsi_panel_driver_notify_resume(struct dsi_panel *panel)
-{
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_UNBLANK;
-	event.data = &blank;
-
-	drm_notifier_call_chain(DRM_EXT_EVENT_AFTER_BLANK, &event);
-}
-
-static void dsi_panel_driver_notify_suspend(struct dsi_panel *panel)
-{
-	struct drm_ext_event event;
-	int blank = DRM_BLANK_POWERDOWN;
-	event.data = &blank;
-
-	drm_notifier_call_chain(DRM_EXT_EVENT_BEFORE_BLANK, &event);
-
-}
-
 static void dsi_panel_driver_oled_short_det_setup(struct dsi_panel *panel,
 								bool enable)
 {
@@ -1607,7 +1556,6 @@ void dsi_panel_driver_post_enable(struct dsi_panel *panel)
 	somc_panel_colormgr_apply_calibrations(
 			panel->spec_pdata->color_mgr->pcc_profile);
 	somc_panel_fps_cmd_send(panel);
-	dsi_panel_driver_notify_resume(panel);
 
 	/* Set it after resume so that the mXT640u can cancel SOD */
 	display_sod_mode = SOD_POWER_ON;
@@ -1616,7 +1564,6 @@ void dsi_panel_driver_post_enable(struct dsi_panel *panel)
 void dsi_panel_driver_pre_disable(struct dsi_panel  *panel)
 {
 	dsi_panel_driver_oled_short_det_setup(panel, false);
-	dsi_panel_driver_notify_suspend(panel);
 }
 
 void dsi_panel_driver_disable(struct dsi_panel  *panel)
@@ -1669,7 +1616,6 @@ int somc_panel_set_doze_mode(struct drm_connector *connector,
 				rc = dsi_panel_set_aod_off(panel);
 			spec_pdata->aod_mode = power_mode;
 			display_aod_mode = 0;
-			dsi_panel_driver_notify_resume(panel);
 			break;
 		case SDE_MODE_DPMS_LP1:
 			pr_info("Entering LP1 state from %d\n",
@@ -1693,7 +1639,6 @@ int somc_panel_set_doze_mode(struct drm_connector *connector,
 
 			rc = dsi_panel_set_lp1(panel);
 			rc = dsi_panel_set_aod_on(panel);
-			dsi_panel_driver_notify_suspend(panel);
 			break;
 		case SDE_MODE_DPMS_LP2:
 			pr_info("Entering LP2 state from %d\n",
@@ -1715,7 +1660,6 @@ int somc_panel_set_doze_mode(struct drm_connector *connector,
 
 			spec_pdata->aod_mode = power_mode;
 			display_aod_mode = power_mode;
-			dsi_panel_driver_notify_suspend(panel);
 			break;
 		case SDE_MODE_DPMS_OFF:
 			pr_info("Entering OFF state from %d\n",
@@ -1739,7 +1683,6 @@ int somc_panel_set_doze_mode(struct drm_connector *connector,
 
 			spec_pdata->aod_mode = power_mode;
 			display_aod_mode = power_mode;
-			dsi_panel_driver_notify_suspend(panel);
 			rc = dsi_panel_set_aod_off(panel);
 			break;
 		default:
@@ -1841,7 +1784,6 @@ static ssize_t dsi_panel_sod_mode_store(struct device *dev,
 	int mode;
 	struct panel_specific_pdata *spec_pdata = NULL;
 	struct dsi_display *display = dev_get_drvdata(dev);
-	struct dsi_panel *panel = display->panel;
 
 	spec_pdata = display->panel->spec_pdata;
 
@@ -1858,7 +1800,6 @@ static ssize_t dsi_panel_sod_mode_store(struct device *dev,
 		if (mode == SOD_POWER_ON && spec_pdata->display_onoff_state) {
 			spec_pdata->sod_mode = mode;
 			display_sod_mode = spec_pdata->sod_mode;
-			dsi_panel_driver_notify_resume(panel);
 		} else if (mode == SOD_POWER_ON) {
 			spec_pdata->sod_mode = mode;
 			display_sod_mode = spec_pdata->sod_mode;
@@ -1868,13 +1809,11 @@ static ssize_t dsi_panel_sod_mode_store(struct device *dev,
 			pr_info("%s: power off\n", __func__);
 			spec_pdata->sod_mode = mode;
 			display_sod_mode = spec_pdata->sod_mode;
-			dsi_panel_driver_notify_suspend(panel);
 		} else if (mode == SOD_POWER_OFF &&
 			   !spec_pdata->display_onoff_state) {
 			pr_info("%s: power off\n", __func__);
 			spec_pdata->sod_mode = mode;
 			display_sod_mode = spec_pdata->sod_mode;
-			dsi_panel_driver_notify_suspend(panel);
 		}
 	}
 	mutex_unlock(&display->display_lock);
