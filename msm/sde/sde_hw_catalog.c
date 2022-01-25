@@ -4357,6 +4357,8 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		sde_cfg->sui_block_xin_mask = 0xC61;
 		sde_cfg->has_hdr = false;
 		sde_cfg->has_sui_blendstage = true;
+		clear_bit(MDSS_INTR_LTM_0_INTR, sde_cfg->mdss_irqs);
+		clear_bit(MDSS_INTR_LTM_1_INTR, sde_cfg->mdss_irqs);
 	} else if (IS_BENGAL_TARGET(hw_rev)) {
 		sde_cfg->has_cwb_support = false;
 		sde_cfg->has_qsync = true;
