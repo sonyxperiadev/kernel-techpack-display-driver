@@ -8,7 +8,7 @@ ifeq ($(TARGET_SUPPORT),genericarmv8)
 	KBUILD_OPTIONS += CONFIG_ARCH_WAIPIO=y
 endif
 
-obj-m += msm/
+obj-y += msm/
 
 all:
 	$(MAKE) -C $(KERNEL_SRC) M=$(M) modules $(KBUILD_OPTIONS)
