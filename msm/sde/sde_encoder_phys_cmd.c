@@ -408,7 +408,9 @@ static void sde_encoder_phys_cmd_cont_splash_mode_set(
 	}
 
 	phys_enc->cached_mode = *adj_mode;
+#ifndef CONFIG_ARCH_SONY_TAMA
 	phys_enc->enable_state = SDE_ENC_ENABLED;
+#endif
 
 	if (!phys_enc->hw_ctl || !phys_enc->hw_pp) {
 		SDE_DEBUG("invalid ctl:%d pp:%d\n",
