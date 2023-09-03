@@ -189,7 +189,7 @@ int dsi_pll_init(struct platform_device *pdev, struct dsi_pll_resource **pll)
 		return -ENOMEM;
 	}
 
-	pr_info("PLL base=%p\n", pll_res->pll_base);
+	pr_info("PLL base=%px\n", pll_res->pll_base);
 
 	if (dsi_pll_get_ioresources(pdev, &pll_res->phy_base, "dsi_phy")) {
 		DSI_PLL_ERR(pll_res, "Unable to remap pll phy base resources\n");
