@@ -575,6 +575,11 @@ static void dp_power_set_gpio(struct dp_power_private *power, bool flip)
 		if (dp_power_find_gpio(config->gpio_name, "aux-sel"))
 			config->value = flip;
 
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+		if (dp_power_find_gpio(config->gpio_name, "aux-en"))
+			config->value = 1;
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 		if (gpio_is_valid(config->gpio)) {
 			DP_DEBUG("gpio %s, value %d\n", config->gpio_name,
 				config->value);
