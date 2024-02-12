@@ -5260,10 +5260,6 @@ int dsi_panel_unprepare(struct dsi_panel *panel)
 		goto error;
 	}
 
-#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
-	rc = dsi_panel_driver_post_power_off(panel);
-#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
-
 error:
 	mutex_unlock(&panel->panel_lock);
 	return rc;
@@ -5286,6 +5282,11 @@ int dsi_panel_post_unprepare(struct dsi_panel *panel)
 		       panel->name, rc);
 		goto error;
 	}
+
+#ifdef CONFIG_DRM_SDE_SPECIFIC_PANEL
+	rc = dsi_panel_driver_post_power_off(panel);
+#endif /* CONFIG_DRM_SDE_SPECIFIC_PANEL */
+
 error:
 	mutex_unlock(&panel->panel_lock);
 	return rc;
