@@ -730,6 +730,7 @@ fail:
 static void *get_vaddr(struct drm_gem_object *obj, unsigned madv)
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
+	pgprot_t pg_prot = PAGE_KERNEL;
 	int ret = 0;
 
 	mutex_lock(&msm_obj->lock);
@@ -767,8 +768,11 @@ static void *get_vaddr(struct drm_gem_object *obj, unsigned madv)
 			msm_obj->vaddr =
 				dma_buf_vmap(obj->import_attach->dmabuf);
 		} else {
+			if (obj->dev && obj->dev->dev && !dev_is_dma_coherent(obj->dev->dev))
+				pg_prot = pgprot_writecombine(PAGE_KERNEL);
+
 			msm_obj->vaddr = vmap(pages, obj->size >> PAGE_SHIFT,
-				VM_MAP, PAGE_KERNEL);
+				VM_MAP, pg_prot);
 		}
 
 		if (msm_obj->vaddr == NULL) {
