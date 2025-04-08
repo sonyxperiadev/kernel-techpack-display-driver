@@ -50,6 +50,11 @@ ifeq ($(CONFIG_ARCH_ANORAK), y)
 	LINUX_INC +=	-include $(DISPLAY_ROOT)/config/gki_anorakdispconf.h
 endif
 
+ifeq ($(CONFIG_ARCH_BLAIR), y)
+	include $(DISPLAY_ROOT)/config/gki_holidisp.conf
+	LINUX_INC +=	-include $(DISPLAY_ROOT)/config/gki_holidispconf.h
+endif
+
 LINUX_INC +=	-Iinclude/linux \
 		-Iinclude/linux/drm
 
