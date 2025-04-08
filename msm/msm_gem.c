@@ -700,10 +700,17 @@ void msm_gem_aspace_domain_attach_detach_update(
 int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 		struct drm_mode_create_dumb *args)
 {
+	uint32_t flags = MSM_BO_SCANOUT;
+
+	if (dev && dev->dev && dev_is_dma_coherent(dev->dev))
+		flags |= MSM_BO_CACHED;
+	else
+		flags |= MSM_BO_WC;
+
 	args->pitch = align_pitch(args->width, args->bpp);
 	args->size  = PAGE_ALIGN(args->pitch * args->height);
 	return msm_gem_new_handle(dev, file, args->size,
-			MSM_BO_SCANOUT | MSM_BO_CACHED, &args->handle, "dumb");
+			flags, &args->handle, "dumb");
 }
 
 int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
